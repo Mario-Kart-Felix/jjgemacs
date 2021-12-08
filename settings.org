@@ -20,8 +20,8 @@ init (nor am I sure I want it to). So not everything is likely to be 100% yet.
    just habit.
 
   #+begin_src emacs-lisp
-    (setq mac-option-modifier 'meta)
-    (setq mac-command-modifier 'super)
+    (setq mac-option-modifier 'super)
+    (setq mac-command-modifier 'meta)
     (setq mac-pass-command-to-system 't)
 
     (define-key global-map [?\s-v] 'yank)
@@ -55,6 +55,34 @@ init (nor am I sure I want it to). So not everything is likely to be 100% yet.
     (sensible-defaults/use-all-keybindings)
     (sensible-defaults/backup-to-temp-directory)
   #+end_src
+** Font
+
+   I need better font management, setting the height like this seems like a bad
+   pattern, maybe it should be in custom.el. For now though setting the font
+   based on the detected screen resolution seems like it might work.
+
+   For now checkingg the display width should be sufficient, if it's 1920 then
+   we'll use the smaller font size.
+
+#+begin_src emacs-lisp :results silent
+  ;; fonts I'm playing with:
+  ;; iosevka
+  ;; Source Code Pro
+  ;; Hack (150)
+  ;; Fantasque Sans Mono
+  (defvar *my-font-size* 140)
+  (when (= (display-pixel-width) 1920)
+    (setq *my-font-size* 100))
+  (when (= (display-pixel-width) 3456)
+    (setq *my-font-size* 100))
+  (when (= (display-pixel-width) 3840)
+    (setq *my-font-size* 120))
+  (message (concat "Setting font to: " (number-to-string *my-font-size*)))
+  (defvar *my-font* "")
+  (setq *my-font* "Hack")
+  (set-face-attribute 'default nil :font *my-font* :height *my-font-size*)
+  (set-frame-font *my-font* nil t)
+#+end_src
 
 ** Some Initial UI Changes
 
@@ -70,29 +98,11 @@ init (nor am I sure I want it to). So not everything is likely to be 100% yet.
   #+end_src
 
 ** Package Management
-*** Straight
-    Going to attempt to use straight this time around.
-
-  #+begin_src emacs-lisp
-    (defvar bootstrap-version)
-    (let ((bootstrap-file
-	   (expand-file-name "straight/repos/straight.el/bootstrap.el" user-emacs-directory))
-	  (bootstrap-version 5))
-      (unless (file-exists-p bootstrap-file)
-	(with-current-buffer
-	    (url-retrieve-synchronously
-	     "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
-	     'silent 'inhibit-cookies)
-	  (goto-char (point-max))
-	  (eval-print-last-sexp)))
-      (load bootstrap-file nil 'nomessage))
-  #+end_src
-
-  Integrate with use-package
-
-  #+begin_src emacs-lisp
-    (straight-use-package 'use-package)
-  #+end_src
+Package management has been moved to init.el, prior to tangling this file. The
+reason is that I need to be able to use a more current version of org, which
+means pulling in org prior to this file being processed. Otherwise I get the
+built in version which as of Emacs 27.1 is outdated to the point where org-roam
+doesn't work.
 
 ** Look and feel
    Pull in doom themes to use the bold, italic, and doom-vibrant.
@@ -128,6 +138,17 @@ init (nor am I sure I want it to). So not everything is likely to be 100% yet.
     :straight t)
 #+end_src
 ** Projectile
+
+I'm not sure what exactly happened here, but I believe when I installed Rustic
+an older version of project.el was installed somehow but not loaded? Which
+doesn't make real sense, rustic requires project but the version in the straight
+repos was up to date (at least as far as master). Still explicitly requiring the
+project package makes the problem go away...
+#+begin_src emacs-lisp :results silent
+  (use-package project
+    :straight t)
+#+end_src
+
 #+begin_src emacs-lisp
   (use-package projectile
     :straight  t
@@ -272,6 +293,31 @@ Provides a dropdown menu in the modeline.
     :straight t
     :config (minions-mode 1))
 #+end_src
+** Journal
+I keep starting and stopping journals, but it's just a good damn idea for work
+so trying again.
+#+begin_src emacs-lisp
+  (defun get-journal-file-yesterday ()
+    "Gets filename for yesterday's journal entry."
+    (let* ((yesterday (time-subtract (current-time) (days-to-time 1)))
+           (daily-name (format-time-string "%Y%m%d" yesterday)))
+      (expand-file-name (concat org-journal-dir daily-name))))
+
+  (defun journal-file-yesterday ()
+    "Creates and load a file based on yesterday's date."
+    (interactive)
+    (find-file (get-journal-file-yesterday)))
+
+  (use-package org-journal
+    :straight t
+    :bind (("C-c t" . org-journal-new-entry)
+           ("C-c y" . journal-file-yesterday))
+    :custom
+    (org-journal-dir "~/.journal/")
+    (org-journal-file-format "%Y%m%d")
+    (org-journal-date-format "%e %b %Y (%A)")
+    (org-journal-time-format ""))
+#+end_src
 ** Misc
 A bunch of stuff that was sitting around loose in my old init. I should review
 these to see what should stay and what shouldn't.
@@ -306,10 +352,29 @@ remember.
   (setq auto-save-file-name-transforms
         `((".*", temporary-file-directory t)))
 #+end_src
+*** Don't use tabs
+#+begin_src emacs-lisp
+  (setq-default indent-tabs-mode nil)
+#+end_src
+*** Expand Region
+#+begin_src emacs-lisp
+  (use-package expand-region
+    :straight t
+    :bind ("M-@" . er/expand-region))
+#+end_src
 * General Tools
-** Restclient Mode
-*** TODO Double check that this works and that the jq portion works now that I've moved it over.
+** Treemacs
+#+begin_src emacs-lisp
+  (use-package treemacs
+    :straight t
+    :defer t
+    :bind
+    (:map global-map
+           ("M-0"       . treemacs-select-window)
+           ("C-x t t"   . treemacs)))
+#+end_src
 
+** Restclient Mode
 Can't live without restclient mode, way too useful.
 
 #+begin_src emacs-lisp
@@ -335,15 +400,24 @@ Window switching made easy via Ace Window.
     :straight t)
   (setq aw-keys '(?a ?s ?d ?f ?g ?h ?j ?k ?l))
 
-  (key-chord-define-global "ww" 'ace-select-window)
+  (key-chord-define-global "qq" 'ace-select-window)
 #+end_src
+
+Replace the normal window switch with ace-select window.
+
+#+begin_src emacs-lisp :results silent
+(global-set-key (kbd "C-x o") 'ace-select-window)
+#+end_src
+
 ** Org Mode
 
    First things first, require org tempo to get the easy templates back. This
-   enables stuff like '<s tab' to create source blocks.
+   enables stuff like '<s tab' to create source blocks. Not sure when this
+   changed so I'm going to make the check below 27.2.
 
   #+begin_src emacs-lisp
-    (require 'org-tempo)
+    (when (version<= "27.1" emacs-version)
+        (require 'org-tempo))
   #+end_src
 
   Org bullets please.
@@ -354,26 +428,40 @@ Window switching made easy via Ace Window.
       (add-hook 'org-mode-hook #'org-bullets-mode))
   #+end_src
 
+  Same here, when I'm on emacs <= 27.2 this doesn't work.
+
   #+begin_src emacs-lisp
-    (add-hook 'org-mode-hook 'org-indent-mode)
+    (when (version<= "27.1" emacs-version)
+        (add-hook 'org-mode-hook 'org-indent-mode))
   #+end_src
 
   Org Babel setup. I haven't checked that all these work when moving to this new
   init. Also that ob-restclient load can probably be handle better.
 
   #+begin_src emacs-lisp
+    (use-package ob-kotlin
+      :straight (ob-kotlin :type git :host github :repo "zweifisch/ob-kotlin"))
+  #+end_src
+
+  #+begin_src emacs-lisp
+    (use-package ob-typescript
+      :straight t)
+  #+end_src
+  #+begin_src emacs-lisp :results silent
 
     (use-package ob-go
     :straight t)
       ;; TODO TEMPORARY I need a solution for managing non-package elisp files
     ;; this requires manually putting the restclient code in the search path
-    ;; TODO this can probably be a gitsubmodule
+    ;; TODO this can probably be a gitsubmodule ... hey change this to use straight
     (load-file (concat *install-dir* "ob-restclient.el"))
     (require 'ob-restclient)
     (require 'ob-go)
     (require 'ob-clojure)
     (require 'ob-js)
     (require 'ob-groovy)
+    (require 'ob-kotlin)
+    (require 'ob-typescript)
 
     (with-eval-after-load 'org
       (org-babel-do-load-languages 'org-babel-load-languages
@@ -383,6 +471,10 @@ Window switching made easy via Ace Window.
                                                              (sql		.	t)
                                                              (python	.	t)
                                                              (go		.	t)
+                                                             (sql           .       t)
+                                                             (kotlin        .       t)
+                                                             (typescript    .       t)
+                                                             (scheme        .       t)
                                                              (js		.	t)
                                                              (restclient	.	t)
                                                              (groovy        .       t))))
@@ -391,11 +483,36 @@ Window switching made easy via Ace Window.
 
   #+end_src
 
+
+Setting up org roam to get my notes in order.
+
+#+begin_src emacs-lisp :results nil
+  (use-package org-roam
+    :straight t
+    :init
+    (setq org-roam-v2-ack t)
+    :custom
+    (org-roam-directory "~/roam-notes")
+    :bind (("C-c n l" . org-roam-buffer-toggle)
+           ("C-c n f" . org-roam-node-find)
+           ("C-c n i" . org-roam-node-insert))
+    :config
+    (org-roam-setup))
+#+end_src
+
+#+RESULTS:
+: org-roam-node-insert
+
 *** Logging done in org mode
 #+begin_src emacs-lisp
   (setq org-log-done 'time)
 #+end_src
 
+*** Ob async
+#+begin_src emacs-lisp
+  (use-package ob-async
+    :straight (ob-async :type git :host github :repo "astahlman/ob-async"))
+#+end_src
 ** Magit
 #+begin_src emacs-lisp
   (use-package magit
@@ -512,6 +629,41 @@ Shows what key bindings are open in a particular mode.
     :straight t
     :mode "\\Dockerfile*//")
 #+end_src
+
+#+begin_src emacs-lisp :results silent
+  (use-package docker
+    :straight t
+    :bind ("C-c d" . docker))
+#+end_src
+
+** Col-Highlight
+Working with yaml is a pain in the ass without this:
+Might drop this...
+#+begin_src emacs-lisp
+  (use-package col-highlight
+    :straight (col-highlight :type git :host github :repo "emacsmirror/col-highlight"))
+#+end_src
+
+** Highlight indentation
+#+begin_src emacs-lisp
+    (use-package highlight-indentation
+      :straight (highlight-indentation :type git :host github :repo "antonj/Highlight-Indentation-for-Emacs")
+      :config
+      (set-face-background 'highlight-indentation-current-column-face "#60646b")
+      (set-face-background 'highlight-indentation-face "#2c2e30"))
+#+end_src
+
+** Smart Shift
+#+begin_src emacs-lisp
+  (use-package smart-shift
+    :straight (smart-shift :type git :host github :repo "hbin/smart-shift"))
+#+end_src
+** Flycheck
+#+begin_src emacs-lisp
+  (use-package flycheck
+    :straight t)
+#+end_src
+
 ** Dumb Jump
 Let's give dumb jump a try again.
 #+begin_src emacs-lisp
@@ -526,6 +678,89 @@ grabbing it mainly just to insert a random uuid into a buffer.
   (use-package uuidgen
     :straight (uuidgen :type git :host github :repo "kanru/uuidgen-el"))
 #+end_src
+
+** AJ Toggle
+#+begin_src emacs-lisp
+  (defun aj-toggle-fold ()
+    "Toggle fold all lines larger than indentation on current line"
+    (interactive)
+    (let ((col 1))
+      (save-excursion
+        (back-to-indentation)
+        (setq col (+ 1 (current-column)))
+        (set-selective-display
+         (if selective-display nil (or col 1))))))
+  (global-set-key [(M C i)] 'aj-toggle-fold)
+#+end_src
+** Indentation Inference
+When working with files you didn't write you might run into other indentation
+offsets, this packages is supposed to infer based on the file.
+
+#+begin_src emacs-lisp
+  (use-package dtrt-indent
+    :straight (dtrt-indent :type git :host github :repo "jscheid/dtrt-indent"))
+#+end_src
+
+** My Github Cloning Tool
+#+begin_src emacs-lisp :results silent
+  (load (locate-user-emacs-file "github.el") nil :nomessage)
+#+end_src
+
+** My Project creation tools
+#+begin_src emacs-lisp :results silent
+  (load (locate-user-emacs-file "my-projects.el") nil :nomessage)
+#+end_src
+** ejc-sql
+
+#+begin_src emacs-lisp :results silent
+  (use-package ejc-sql
+    :straight t
+    :commands
+    (ejc-create-connection ejc-connect ejc-set-column-width-limit)
+    :init
+    (setq ejc-set-rows-limit 1000
+          ejc-result-table-impl 'orgtbl-mode
+          nrepl-sync-request-timeout 30)
+    (push 'ejc-company-backend company-backends)
+    (add-hook 'ejc-sql-minor-mode-hook
+              (lambda ()
+                (company-mode t))))
+#+end_src
+
+#+begin_src emacs-lisp :results silent
+      (defun connect-to-tw-athena ()
+        (interactive)
+        (ejc-create-connection "TW Athena Conn"
+                               :dependencies [[com.syncron.amazonaws/simba-athena-jdbc-driver "2.0.2"]]
+                               :dbtype "awsathena"
+                               :classname "com.simba.athena.jdbc.Driver"
+                               :subprotocol "awsathena"
+                               :subname "//athena.us-east-1.amazonaws.com:443/my_database;AwsCredentialsProviderArguments=default;AwsCredentialsProviderClass=com.simba.athena.amazonaws.auth.profile.ProfileCredentialsProvider;S3OutputLocation=s3://jayg-athena-query-holder/"))
+#+end_src
+** libvterm
+#+begin_src emacs-lisp :results silent
+  (use-package vterm
+    :straight t)
+#+end_src
+** s3ed
+Trial of package to explore s3 repositories:
+TODO Figure out why this breaks...
+#+begin_src emacs-lisp :results silent
+  (use-package s3ed
+    :straight t)
+#+end_src
+
+** Multiple Cursors
+#+begin_src emacs-lisp :results silent
+  (use-package multiple-cursors
+    :straight t)
+#+end_src
+** Dot Env
+#+begin_src emacs-lisp :results silent
+  (use-package dotenv-mode
+    :straight t)
+#+end_src
+
 * Languages
 ** General
 *** Smart Parens
@@ -541,6 +776,14 @@ Bindings that shouldn't be global but are for now.
   (global-set-key (kbd "C-)") 'sp-forward-slurp-sexp) ;; this shouldn't be always set but for now if it gets me going
   (global-set-key (kbd "M-s") 'sp-splice-sexp)
 #+end_src
+*** Javascript
+#+begin_src emacs-lisp :results nil
+  (setq js-indent-level 2)
+#+end_src
+
+#+RESULTS:
+: 2
+
 *** JSON
 Extends the built in javascript mode iirc.
 #+begin_src emacs-lisp
@@ -553,6 +796,14 @@ Extends the built in javascript mode iirc.
     :straight t
     :mode ("\\.ya?ml\\'" . yaml-mode))
 #+end_src
+
+Not working yet...
+#+begin_src emacs-lisp
+(add-hook 'yaml-mode-hook 'highlight-indentation-mode)
+(add-hook 'yaml-mode-hook 'highlight-indentation-current-line-mode)
+(add-hook 'yaml-mode-hook 'smart-shift-mode)
+(add-hook 'yaml-mode-hook 'flycheck-mode)
+#+end_src
 *** Markdown
 #+begin_src emacs-lisp
   (use-package markdown-mode
@@ -561,17 +812,44 @@ Extends the built in javascript mode iirc.
 #+end_src
 *** LSP Mode
 Installing this to experiment with Kotlin but likely to use elsewhere.
-#+begin_src emacs-lisp
+#+begin_src emacs-lisp :results silent
   (use-package lsp-mode
     :commands (lsp lsp-deferred)
     :straight t
     :init (setq lsp-keymap-prefix "C-c l")
-    :config (lsp-enable-which-key-integration t))
+    :custom
+    (lsp-eldoc-render-all t)
+    (lsp-idle-delay 0.6)
+    :config (lsp-enable-which-key-integration t)
+    (add-hook 'lsp-mode-hook 'lsp-ui-mode))
+  #+end_src
+
+#+begin_src emacs-lisp :results silent
+  (use-package lsp-ui
+    :straight t
+    :commands lsp-ui-mode
+    :custom
+    (lsp-ui-peek-always-show t)
+    (lsp-ui-sideline-show-hover t)
+    (lsp-ui-doc-enable nil))
 #+end_src
+
+#+RESULTS:
+
 *** GraphQL
 #+begin_src emacs-lisp
   (use-package graphql-mode
     :straight t)
+#+end_src
+
+#+RESULTS:
+
+Going to pull in a library I found GraphQL.el. This should let me more easily
+build queries for use in resclient mode, or better yet in an org babel block.
+
+#+begin_src emacs-lisp
+  (use-package graphql
+    :straight (graphql :type git :host github :repo "vermiculus/graphql.el"))
 #+end_src
 *** repl-toggle
 Clojure has this built into Cider I guess I'll want it elsewhere. We'll set it
@@ -581,7 +859,7 @@ add other languages.
   (use-package repl-toggle
     :straight (repl-toggle :type git :host github :repo "tomterl/repl-toggle")
     :init
-    (setq rtog/fullscreen t)
+    (setq rtog/fullscreen nil)
     (setq rtog/mode-repl-alist '((emacs-lisp-mode . ielm))))
 #+end_src
 ** Lisp
@@ -610,6 +888,36 @@ add other languages.
   (add-hook 'slime-repl-mode-hook #'rainbow-delimiters-mode)
   (add-hook 'slime-repl-mode-hook #'smartparens-mode)
   (add-hook 'slime-repl-mode-hook #'turn-on-smartparens-strict-mode)
+#+end_src
+** Scheme
+#+begin_src emacs-lisp
+  (use-package geiser
+    :straight t
+    :custom
+      (geiser-active-implementations '(guile mit))
+      (geiser-set-default-implementation 'mit))
+#+end_src
+
+#+begin_src emacs-lisp
+  (add-hook 'scheme-mode-hook #'rainbow-delimiters-mode)
+  (add-hook 'scheme-mode-hook #'smartparens-mode)
+  (add-hook 'scheme-mode-hook #'turn-on-smartparens-strict-mode)
+#+end_src
+
+** Racket
+I'm not sure yet if I want to use racket-more or just plug racket into geiser.
+From what I've read geiser gives a more SLIME like experience (which I'm used
+to) but I'm going to take a crack and racket-mode as well.
+
+#+begin_src emacs-lisp :results silent
+  (use-package racket-mode
+    :straight t)
+#+end_src
+
+#+begin_src emacs-lisp :results silent
+  (add-hook 'racket-mode-hook #'smartparens-mode)
+  (add-hook 'racket-mode-hook #'rainbow-delimiters-mode)
+  (add-hook 'racket-mode-hook #' turn-on-smartparens-strict-mode)
 #+end_src
 ** Elisp
 *** Hooks
@@ -697,8 +1005,10 @@ Experimental, not sure if Kotlin is worth taking a run at in emacs or not with
 IntelliJ having first class support :/.
 #+begin_src emacs-lisp
   (use-package kotlin-mode
-    :straight t)
+    :straight t
+    :hook (kotlin-mode . lsp-deferred))
 #+end_src
+
 ** Typescript
 Require's lsp server for typescript.
 npm install -g typescript-language-server
@@ -715,6 +1025,10 @@ npm install -g typescript-language-server
                                         (local-set-key (kbd "C-c C-z") 'rtog/goto-buffer-fun)))
   )
 #+end_src
+
+# TODO add raw js crap
+# nodejs-repl
+# run ts handles js and ts?
 
 Parse ansi escape codes:
 
@@ -743,6 +1057,73 @@ Pop to repl, depends on the pop-to-repl package set up above.
                 (local-set-key (kbd "C-c C-b") 'ts-send-buffer-and-go)
                 (local-set-key (kbd "C-c l") 'ts-load-file-and-go))))
 #+end_src
+
+** Python
+
+I guess python mode comes pre-installed with emacs? Not sure whether to try an
+LSP solution or Elpy, Elply for now.
+
+#+begin_src emacs-lisp :results silent
+  (use-package elpy
+    :straight t
+    :init
+    (elpy-enable)
+    (setq elpy-rpc-python-command "python3")
+    (setq elpy-rpc-virtualenv-path 'current)
+    )
+#+end_src
+
+** C/C++
+
+#+begin_src emacs-lisp :results silent
+  (setq company-clang-executable "clang-11")
+#+end_src
+
+** Rust
+
+Rust is installed in the usual way via the rust up site. For now I'm trying the lsp mode for rust as detailed here: https://robert.kra.hn/posts/2021-02-07_rust-with-emacs/
+
+I clone the rust-analyzer projects into my usual directory structure ~/development/org/project, so in this case ~/development/rust-analyzer/rustanalyzer.
+
+*** Rustic
+
+#+begin_src emacs-lisp :results silent
+  (use-package rustic
+    :straight t
+    :bind (:map rustic-mode-map
+                ("M-j" . lsp-ui-imenu)
+                ("M-?" . lsp-find-references)
+                ("C-c C-c l" . flycheck-list-erros)
+                ("C-c C-c a" . lsp-execute-code-action)
+                ("C-c C-c r" . lsp-rename)
+                ("C-c C-c q" . lsp-workspace-restart)
+                ("C-c C-c Q" . lsp-workspace-shutdown)
+                ("C-c C-c s" . lsp-rust-analyzer-status))
+    :hook (rustic-mode . lsp-deferred)
+    :custom
+      (lsp-rust-analyzer-cargo-watch-command "clippy")
+    :config
+    (setq rustic-format-on-save t)
+    (add-hook 'rustic-mode-hook 'rk/rustic-mode-hook))
+
+  (defun rk/rustic-mode-hook ()
+    ;; so that run C-c C-c C-r works without having to confirm, but don't try to
+    ;; save rust buffers that are not file visiting. Once
+    ;; https://github.com/brotzeit/rustic/issues/253 has been resolved this should
+    ;; no longer be necessary.
+    (when buffer-file-name
+      (setq-local buffer-save-without-query t)))
+#+end_src
+
+*** Rustic hooks
+
+#+begin_src emacs-lisp :results silent
+    (add-hook 'rustic-mode-hook #'rainbow-delimiters-mode)
+    (add-hook 'rustic-mode-hook #'smartparens-mode)
+    (add-hook 'rustic-mode-hook #'turn-on-smartparens-strict-mode)
+#+end_src
+
+#+RESULTS:
 
 * Misc Functions
 ** xml format function (stolen from Chris Gore)
@@ -773,11 +1154,49 @@ Pop to repl, depends on the pop-to-repl package set up above.
 
 ** open multiple eshell buffers
 #+begin_src emacs-lisp
-  ;; taken from here: https://www.emacswiki.org/emacs/EshellMultipleEshellBuffers#:~:text=Multi%2Deshell,-multi%2Deshell.&text=It%20maintains%20a%20ring%20of,buffer%20in%20the%20shell%20ring.
+  ;; taken from here: https://wwvw.emacswiki.org/emacs/EshellMultipleEshellBuffers#:~:text=Multi%2Deshell,-multi%2Deshell.&text=It%20maintains%20a%20ring%20of,buffer%20in%20the%20shell%20ring.
   (defun eshell-new ()
     "Open a new instance of eshell."
     (interactive)
     (eshell 'N))
+#+end_src
+
+** Reading .env files
+My current company makes use of .env files so having some functions to read them
+in easily is useful. I'll come back and add code to toss out blank lines and
+comment lines (starting with '#' later). This is my quick and dirty solution to
+get existing env file data.
+
+If this gets any more complicated I'll move it into its own package.
+
+#+begin_src emacs-lisp
+  (defun read-lines (path)
+    (with-temp-buffer
+      (insert-file-contents path)
+      (split-string (buffer-string) "\n" t)))
+
+  (defun env-var->alist-pair (string)
+    "Takes a string of the form `var=val` and turns it into an
+    alist pair''"
+    (split-string string "=" t))
+
+  (defun read-env-from-dotenv (dotenv-file var)
+    "Returns a specific var from a .env file."
+    (car
+     (cdr
+      (assoc var
+             (mapcar (lambda (x)
+                       (env-var->alist-pair x))
+                     (read-lines dotenv-file))))))
+
+#+end_src
+
+* DB-Connections
+
+I keep my db connections in a separate config that's not checked in.
+
+#+begin_src emacs-lisp :results silent
+  (load "~/.emacs-dbs.el")
 #+end_src
 
 * Keep Custom out of this file
