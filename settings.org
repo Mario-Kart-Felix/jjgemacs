@@ -760,6 +760,24 @@ TODO Figure out why this breaks...
   (use-package dotenv-mode
     :straight t)
 #+end_src
+** Jira
+
+Ewww...
+
+#+begin_src emacs-lisp :results silent
+  (use-package org-jira
+    :straight t)
+#+end_src
+
+#+begin_src emacs-lisp :results silent
+  (when (not (file-directory-p "~/.org-jira"))
+    (make-directory "~/.org-jira"))
+#+end_src
+
+Change or delete this if I switch jobs.
+#+begin_src emacs-lisp :results silent
+  (setq jiralib-url "https://tradeswell.atlassian.net/")
+#+end_src
 
 * Languages
 ** General
@@ -780,9 +798,6 @@ Bindings that shouldn't be global but are for now.
 #+begin_src emacs-lisp :results nil
   (setq js-indent-level 2)
 #+end_src
-
-#+RESULTS:
-: 2
 
 *** JSON
 Extends the built in javascript mode iirc.
@@ -818,7 +833,6 @@ Installing this to experiment with Kotlin but likely to use elsewhere.
     :straight t
     :init (setq lsp-keymap-prefix "C-c l")
     :custom
-    (lsp-eldoc-render-all t)
     (lsp-idle-delay 0.6)
     :config (lsp-enable-which-key-integration t)
     (add-hook 'lsp-mode-hook 'lsp-ui-mode))
@@ -827,14 +841,13 @@ Installing this to experiment with Kotlin but likely to use elsewhere.
 #+begin_src emacs-lisp :results silent
   (use-package lsp-ui
     :straight t
-    :commands lsp-ui-mode
-    :custom
-    (lsp-ui-peek-always-show t)
-    (lsp-ui-sideline-show-hover t)
-    (lsp-ui-doc-enable nil))
+    :commands lsp-ui-mode)
 #+end_src
 
-#+RESULTS:
+#+begin_src emacs-lisp :results silent
+
+#+end_src
+
 
 *** GraphQL
 #+begin_src emacs-lisp
@@ -845,7 +858,7 @@ Installing this to experiment with Kotlin but likely to use elsewhere.
 #+RESULTS:
 
 Going to pull in a library I found GraphQL.el. This should let me more easily
-build queries for use in resclient mode, or better yet in an org babel block.
+build queries for use in resclient mode, or better yet in an orgbabel block.
 
 #+begin_src emacs-lisp
   (use-package graphql
@@ -932,15 +945,19 @@ to) but I'm going to take a crack and racket-mode as well.
 #+end_src
 ** Clojure
 Clojure mode.
-#+begin_src emacs-lisp
-  (use-package clojure-mode
-    :straight t
-    :config
-    (add-hook 'clojure-mode-hook #'smartparens-mode)
-    (add-hook 'clojure-mode-hook #'subword-mode)
-    (add-hook 'clojure-mode-hook #'rainbow-delimiters-mode)
-    (add-hook 'clojure-mode-hook #'turn-on-smartparens-mode)
-    (add-hook 'clojure-mode-hook #'turn-on-smartparens-strict-mode))
+#+begin_src emacs-lisp :results silent
+    (use-package clojure-mode
+      :straight t
+      :config
+      (add-hook 'clojure-mode-hook #'smartparens-mode)
+      (add-hook 'clojure-mode-hook #'subword-mode)
+      (add-hook 'clojure-mode-hook #'rainbow-delimiters-mode)
+      (add-hook 'clojure-mode-hook #'turn-on-smartparens-mode)
+      (add-hook 'clojure-mode-hook #'turn-on-smartparens-strict-mode)
+      ;;(add-hook 'clojure-mode-hook 'lsp)
+      (add-hook 'clojurescript-mode-hook 'lsp)
+      (add-hook 'clojurec-mode-hook 'lsp)
+      )
 #+end_src
 
 Gotta have cider.
@@ -1124,6 +1141,18 @@ I clone the rust-analyzer projects into my usual directory structure ~/developme
 #+end_src
 
 #+RESULTS:
+
+** LilyPond
+
+Lilypond mode is installed in `/user/share/emacs/site-lisp` when installed via
+apt-get (on Linux obviously). Not 100% ideal and at a minimum I should check if
+it exists so new installations notify me to install it.
+#+begin_src emacs-lisp :results silent
+  (require 'lilypond-mode)
+  (add-to-list 'auto-mode-alist '("\\.ly\\'" . LilyPond-mode))
+#+end_src
+
+Add a compile and save command.
 
 * Misc Functions
 ** xml format function (stolen from Chris Gore)
